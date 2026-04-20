@@ -1,263 +1,88 @@
- <!DOCTYPE html>
-<html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <title>Richie Maps Pro</title>
-
 <meta name="viewport" content="width=device-width, initial-scale=1">
-
+<meta name="description" content="A clean, immersive map experience with search, live location, routing, and shareable views.">
+<link rel="preconnect" href="https://unpkg.com">
+<link rel="preconnect" href="https://demotiles.maplibre.org">
+<link rel="preconnect" href="https://api.maptiler.com">
+<link rel="preconnect" href="https://nominatim.openstreetmap.org">
+<link rel="preconnect" href="https://router.project-osrm.org">
 <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet">
-<script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
-
-<style>
-
-body{
-margin:0;
-font-family:Arial;
-background:#111;
-color:white;
-}
-
-header{
-display:flex;
-justify-content:space-between;
-align-items:center;
-padding:10px;
-background:#1f1f1f;
-}
-
-#map{
-position:absolute;
-top:60px;
-bottom:0;
-width:100%;
-}
-
-.controls{
-display:flex;
-gap:8px;
-}
-
-input{
-padding:8px;
-border-radius:6px;
-border:none;
-}
-
-button{
-padding:8px;
-border:none;
-border-radius:6px;
-background:#2ecc71;
-color:white;
-cursor:pointer;
-}
-
-.mobilePanel{
-
-position:absolute;
-bottom:0;
-left:0;
-right:0;
-background:#222;
-padding:10px;
-border-top-left-radius:15px;
-border-top-right-radius:15px;
-
-}
-
-</style>
-
+<link rel="stylesheet" href="styles.css">
+<script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js" defer></script>
+<script src="config.js" defer></script>
+<script src="app.js" defer></script>
 </head>
-
 <body>
+<div class="app-shell">
+<div id="map" aria-label="Interactive map"></div>
+<div class="map-vignette" aria-hidden="true"></div>
 
-<header>
-
-<h2>🗺 Richie Maps Pro</h2>
-
-<div class="controls">
-
-<input id="searchBox" placeholder="Search">
-
-<button onclick="searchLocation()">Search</button>
-
-<button onclick="shareLocation()">Share</button>
-
+<header class="topbar">
+<div class="brand-block">
+<p class="eyebrow">Private map concierge</p>
+<h1>Richie Maps Pro</h1>
+<p class="subtitle">Luxury road and satellite views with fast search, clean routing, and instant 2D or 3D perspective control.</p>
+<div class="hero-chip-row" aria-hidden="true">
+<span class="hero-chip">Road</span>
+<span class="hero-chip">Satellite</span>
+<span class="hero-chip">2D / 3D</span>
+</div>
 </div>
 
+<div class="control-deck">
+<form class="search-panel" id="searchForm">
+<label class="sr-only" for="searchBox">Search for a place</label>
+<div class="search-field-wrap">
+<svg viewBox="0 0 24 24" aria-hidden="true" class="search-icon">
+<path d="M10.5 4a6.5 6.5 0 1 0 4.03 11.6l4.43 4.42 1.41-1.41-4.42-4.43A6.5 6.5 0 0 0 10.5 4Zm0 2a4.5 4.5 0 1 1 0 9 4.5 4.5 0 0 1 0-9Z"></path>
+</svg>
+<input id="searchBox" name="search" placeholder="Search a place, landmark, or address" autocomplete="off">
+</div>
+<div class="search-actions">
+<button type="submit" class="primary-button">Search</button>
+<button type="button" id="shareButton" class="secondary-button">Share view</button>
+</div>
+</form>
+
+<section class="view-panel glass-panel" aria-label="Map view controls">
+<div class="panel-row">
+<div>
+<p class="panel-label">Map style</p>
+<p class="panel-note">Switch between clear road detail and satellite imagery.</p>
+</div>
+<div class="toggle-group" role="group" aria-label="Map style selector">
+<button type="button" class="mode-button active" data-style="road">Road</button>
+<button type="button" class="mode-button" data-style="satellite">Satellite</button>
+</div>
+</div>
+<div class="panel-row">
+<div>
+<p class="panel-label">Perspective</p>
+<p class="panel-note">Jump between flat planning and immersive 3D navigation.</p>
+</div>
+<div class="toggle-group" role="group" aria-label="Camera mode selector">
+<button type="button" class="mode-button" data-camera="2d">2D</button>
+<button type="button" class="mode-button active" data-camera="3d">3D</button>
+</div>
+</div>
+</section>
+
+<section class="status-panel glass-panel" aria-live="polite">
+<p class="status-label">Map status</p>
+<p id="statusMessage">Right-click on the map to start a route. Right-click again to set the destination.</p>
+</section>
+</div>
 </header>
 
-<div id="map"></div>
-
-<div class="mobilePanel">
-
-<button onclick="setTransport('driving')">🚗 Car</button>
-<button onclick="setTransport('walking')">🚶 Walk</button>
-<button onclick="setTransport('cycling')">🚴 Bike</button>
-
+<section class="transport-panel glass-panel" aria-label="Transport mode selector">
+<button type="button" class="transport-button active" data-transport="driving">Car</button>
+<button type="button" class="transport-button" data-transport="walking">Walk</button>
+<button type="button" class="transport-button" data-transport="cycling">Bike</button>
+</section>
 </div>
-
-<script>
-
-// MAP
-
-const map = new maplibregl.Map({
-container:'map',
-
-style:'https://api.maptiler.com/maps/streets/style.json?key=Cgs7eUKoah6PEkf0csoY',
-
-center:[-0.09,51.505],
-
-zoom:14,
-pitch:60,
-bearing:-17
-
-});
-
-// CONTROLS
-
-map.addControl(new maplibregl.NavigationControl());
-
-map.addControl(new maplibregl.GeolocateControl({
-positionOptions:{enableHighAccuracy:true},
-trackUserLocation:true
-}));
-
-
-// 3D BUILDINGS
-
-map.on('load',()=>{
-
-map.addLayer({
-'id':'3d-buildings',
-'source':'openmaptiles',
-'source-layer':'building',
-'type':'fill-extrusion',
-
-'paint':{
-
-'fill-extrusion-color':'#aaa',
-
-'fill-extrusion-height':[
-'interpolate',['linear'],['zoom'],
-15,0,
-16,20
-],
-
-'fill-extrusion-base':['get','min_height'],
-'fill-extrusion-opacity':0.6
-}
-
-});
-
-});
-
-
-// SEARCH
-
-async function searchLocation(){
-
-let q=document.getElementById("searchBox").value;
-
-let url=`https://nominatim.openstreetmap.org/search?format=json&q=${q}`;
-
-let res=await fetch(url);
-let data=await res.json();
-
-if(data.length){
-
-let lat=data[0].lat;
-let lon=data[0].lon;
-
-map.flyTo({center:[lon,lat],zoom:16});
-
-new maplibregl.Marker()
-.setLngLat([lon,lat])
-.addTo(map);
-
-}
-
-}
-
-
-// ROUTING
-
-let transport="driving";
-
-function setTransport(type){
-transport=type;
-}
-
-
-map.on("contextmenu",async(e)=>{
-
-if(!window.routeStart){
-
-window.routeStart=e.lngLat;
-
-alert("Select destination");
-
-}else{
-
-let start=window.routeStart;
-let end=e.lngLat;
-
-let url=`https://router.project-osrm.org/route/v1/${transport}/`
-+`${start.lng},${start.lat};${end.lng},${end.lat}?overview=full&geometries=geojson`;
-
-let res=await fetch(url);
-let data=await res.json();
-
-let coords=data.routes[0].geometry.coordinates;
-
-coords=coords.map(c=>[c[0],c[1]]);
-
-map.addSource('route',{
-type:'geojson',
-data:{
-type:'Feature',
-geometry:{
-type:'LineString',
-coordinates:coords
-}
-}
-});
-
-map.addLayer({
-id:'route',
-type:'line',
-source:'route',
-paint:{
-'line-color':'#00ffff',
-'line-width':5
-}
-});
-
-window.routeStart=null;
-
-}
-
-});
-
-
-// SHARE MAP LINK
-
-function shareLocation(){
-
-let center=map.getCenter();
-let zoom=map.getZoom();
-
-let url=location.origin+
-`?lat=${center.lat}&lon=${center.lng}&zoom=${zoom}`;
-
-navigator.clipboard.writeText(url);
-
-alert("Map link copied!");
-
-}
-
-</script>
-
 </body>
 </html>
